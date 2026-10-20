@@ -33,9 +33,13 @@
   }
 
   function pageText() {
+    // Use <main>/<article> only when it holds most of the page; otherwise the whole body,
+    // so long Terms pages split across several sections are read in full.
+    const body = (document.body && document.body.innerText) || "";
     const main = document.querySelector("main, article, [role=main]");
-    const t = main && main.innerText && main.innerText.length > 500 ? main.innerText : (document.body && document.body.innerText) || "";
-    return t.slice(0, 60000);
+    const m = (main && main.innerText) || "";
+    const t = m.length > 500 && m.length >= body.length * 0.6 ? m : body;
+    return t.slice(0, 400000);
   }
 
   // ---------- highlighting ----------

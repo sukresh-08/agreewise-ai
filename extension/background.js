@@ -10,7 +10,7 @@ async function analyze(text) {
   const res = await fetch(AGREEWISE_API + "/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: String(text || "").slice(0, 60000) }),
+    body: JSON.stringify({ text: String(text || "").slice(0, 400000) }),
   });
   let body = null;
   try { body = await res.json(); } catch (_) { /* not JSON */ }

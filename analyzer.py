@@ -12,8 +12,9 @@ import socket
 from urllib.parse import urlparse
 
 MODEL = os.getenv("AGREEWISE_MODEL", "claude-sonnet-5-5")
-MAX_CHARS = 60_000
-MAX_CLAUSES = 150
+MAX_CHARS = 60_000      # text sent to the LLM in AI mode
+MAX_TEXT = 400_000      # total text accepted (keyword mode reads all of it)
+MAX_CLAUSES = 5_000
 
 # category -> (risk level, regex, English reason, Tamil reason)
 RULES = {
@@ -157,7 +158,7 @@ def llm_analyze(text: str) -> dict:
 
 
 def analyze_text(text: str) -> dict:
-    text = text.strip()
+    text = text.strip()[:MAX_TEXT]
     if len(text) < 80:
         raise ValueError("Please provide more policy text (at least a few sentences).")
     if os.getenv("ANTHROPIC_API_KEY"):
