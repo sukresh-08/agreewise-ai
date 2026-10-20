@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AgreeWise AI",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Know what you agree to. A simple summary and risk score for Terms & Privacy Policies, in English and Tamil.",
   "icons": {
     "16": "icons/icon16.png",

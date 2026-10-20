@@ -1,15 +1,31 @@
 """Server helpers shared by the FastAPI app (main.py) and the stdlib dev server."""
 import io
 import json
+import os
 import time
 import zipfile
 from collections import defaultdict, deque
 from pathlib import Path
 from urllib.parse import urlparse
 
-from analyzer import analyze_text, fetch_url_text
-
 ROOT = Path(__file__).parent
+
+
+def load_env(path: Path = ROOT / ".env") -> None:
+    """Read KEY=VALUE lines from a local .env file. Real environment variables win."""
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+load_env()
+
+from analyzer import analyze_text, fetch_url_text  # noqa: E402  (after .env is loaded)
+
 STATIC = ROOT / "static"
 EXT_DIR = ROOT / "extension"
 

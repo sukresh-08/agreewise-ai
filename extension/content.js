@@ -176,7 +176,8 @@
       tabs.append(b);
     }
     panel.append(tabs);
-    if (data.mode !== "llm") panel.append(el("p", "muted", data.note || "Keyword analysis (AI key not set on server)."));
+    panel.append(el("p", "muted", data.mode === "llm" ? "AI analysis by Gemini. Not legal advice."
+      : (data.note || "Keyword analysis (AI unavailable).")));
   }
 
   function show(result) {

@@ -246,7 +246,7 @@
     const n = document.createElement("b"); n.textContent = data.score; badge.append(n, "/100");
     $("verdict").textContent = t.risk[data.level];
     $("counts").textContent = t.counts(data.risky, data.caution);
-    $("note").textContent = data.mode === "llm" ? "AI analysis" : (data.note || "Keyword analysis (AI key not set on server)");
+    $("note").textContent = data.mode === "llm" ? "AI analysis by Gemini" : (data.note || "Keyword analysis (AI key not set on server)");
     const ul = $("summary"); ul.textContent = "";
     for (const s of (lang === "ta" ? data.summary_ta : data.summary_en) || []) { const li = document.createElement("li"); li.textContent = s; ul.append(li); }
     const box = $("clauses"); box.textContent = "";

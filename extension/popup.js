@@ -36,7 +36,7 @@ function render() {
     const q = document.createElement("p"); const qq = document.createElement("q"); qq.textContent = c.text; q.append(qq);
     d.append(tag, why, q); box.append(d);
   }
-  $("note").textContent = data.mode === "llm" ? "AI analysis. Not legal advice." : (data.note || "Keyword analysis (AI key not set on server). Not legal advice.");
+  $("note").textContent = data.mode === "llm" ? "AI analysis by Gemini. Not legal advice." : (data.note || "Keyword analysis (AI key not set on server). Not legal advice.");
   for (const t of document.querySelectorAll(".tab")) t.classList.toggle("on", t.dataset.lang === lang);
 }
 
