@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgreeWise AI · Chrome Extension</title>
+<meta name="description" content="AgreeWise AI is a Chrome extension that reads Terms & Conditions for you: a simple summary, risky clauses highlighted, and a risk score, in English and Tamil.">
+<link rel="icon" href="/static/icon.png">
+<style>
+  :root {
+    --bg:#f5f7fc; --surface:#ffffff; --text:#14203a; --muted:#53627f; --line:#dbe2f0;
+    --navy:#1f3864; --navy2:#2f5597; --orange:#ed7d31; --orange2:#f4a261;
+    --low:#2e9e5b; --med:#d48a00; --high:#d83a3a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0b1220; --surface:#121c30; --text:#e8eefc; --muted:#9aaacb; --line:#25324d; }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.55 system-ui, -apple-system, "Segoe UI", "Noto Sans Tamil", sans-serif; }
+  a { color: inherit; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:12px 20px; border-radius:12px; font-weight:700; text-decoration:none; border:0; cursor:pointer; font-size:16px; }
+  .btn.primary { background:linear-gradient(90deg,var(--orange2),var(--orange)); color:#fff; box-shadow:0 6px 18px rgba(237,125,49,.3); }
+  .btn.ghost { background:transparent; color:var(--text); border:1.5px solid var(--line); }
+  .btn:disabled { opacity:.65; cursor:wait; }
+
+  header { position:sticky; top:0; z-index:5; background:color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); }
+  header .wrap { display:flex; align-items:center; justify-content:space-between; height:60px; gap:12px; }
+  .logo { display:flex; align-items:center; gap:10px; font-weight:800; font-size:18px; text-decoration:none; }
+  .logo img { width:30px; height:30px; } .logo b { color:var(--orange); }
+  header .btn { padding:8px 14px; font-size:14px; }
+
+  .hero { padding:56px 0 40px; }
+  .hero .wrap { display:grid; grid-template-columns: 1.05fr 1fr; gap:40px; align-items:center; }
+  .chip { display:inline-block; padding:4px 12px; border-radius:999px; background:color-mix(in srgb, var(--orange) 15%, transparent); color:var(--orange); font-weight:700; font-size:13px; }
+  h1 { font-size:clamp(32px, 5vw, 50px); line-height:1.08; margin:14px 0 14px; letter-spacing:-.02em; }
+  h1 span { color:var(--orange); }
+  .lead { color:var(--muted); font-size:18px; margin:0 0 24px; max-width:34em; }
+  .ctas { display:flex; gap:12px; flex-wrap:wrap; }
+  .fine { color:var(--muted); font-size:13px; margin-top:12px; }
+
+  /* browser mockup */
+  .browser { background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:0 18px 40px rgba(20,32,58,.15); overflow:hidden; position:relative; }
+  .bar { display:flex; align-items:center; gap:6px; padding:10px 12px; background:color-mix(in srgb, var(--navy) 10%, var(--surface)); }
+  .bar i { width:10px; height:10px; border-radius:50%; display:block; }
+  .url { flex:1; margin-left:8px; background:var(--surface); border-radius:999px; padding:3px 12px; font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ext { width:22px; height:22px; border-radius:6px; background:url(/static/icon.png) center/cover; position:relative; }
+  .ext::after { content:"MED"; position:absolute; right:-10px; bottom:-8px; font-size:9px; font-weight:800; background:var(--med); color:#fff; padding:1px 3px; border-radius:4px; }
+  .page { padding:18px 18px 70px; }
+  .page h4 { margin:0 0 10px; color:var(--navy2); }
+  .ln { height:8px; border-radius:6px; background:var(--line); margin:8px 0; }
+  .flag { margin:10px 0; padding:8px 10px; border-radius:6px; font-size:12.5px; background:rgba(245,185,66,.22); outline:2px solid var(--med); }
+  .flag.r { background:rgba(216,58,58,.14); outline-color:var(--high); }
+  .agree { display:inline-block; margin-top:8px; padding:7px 16px; border-radius:8px; background:#5a6b8c; color:#fff; font-size:13px; font-weight:700; }
+  .pop { position:absolute; right:12px; bottom:12px; width:220px; background:#13213f; color:#e8eefc; border-radius:12px; padding:10px 12px; font-size:12px; box-shadow:0 10px 24px rgba(0,0,0,.35); }
+  .pop .s { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  .pop .b { background:var(--med); color:#111; font-weight:800; border-radius:8px; padding:4px 8px; text-align:center; }
+  .pop .b strong { display:block; font-size:18px; line-height:1; }
+
+  section { padding:48px 0; }
+  h2 { font-size:clamp(24px, 3.4vw, 32px); margin:0 0 8px; letter-spacing:-.01em; }
+  .sub { color:var(--muted); margin:0 0 26px; }
+  .steps { display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; }
+  .steps.four { grid-template-columns:repeat(4, 1fr); }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:20px; }
+  .num { width:34px; height:34px; border-radius:50%; display:grid; place-items:center; background:var(--orange); color:#fff; font-weight:800; margin-bottom:10px; }
+  .card h3 { margin:0 0 6px; font-size:18px; }
+  .card p { margin:0; color:var(--muted); font-size:15px; }
+  code { background:color-mix(in srgb, var(--navy) 10%, transparent); padding:1px 6px; border-radius:6px; font-size:.92em; }
+
+  .alt { background:var(--surface); border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .try { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+  textarea, input[type=url] { width:100%; padding:12px; border-radius:12px; border:1px solid var(--line); background:var(--bg); color:var(--text); font:inherit; font-size:15px; }
+  textarea { min-height:190px; resize:vertical; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; align-items:center; }
+  .toggle button { padding:8px 14px; border-radius:10px; border:1.5px solid var(--line); background:transparent; color:var(--text); font:inherit; cursor:pointer; }
+  .toggle button.on { background:var(--navy); border-color:var(--navy); color:#fff; font-weight:700; }
+  #err { color:var(--high); min-height:1.4em; margin-top:8px; }
+  .empty { color:var(--muted); border:2px dashed var(--line); border-radius:16px; padding:28px; text-align:center; }
+  .score { display:flex; align-items:center; gap:16px; }
+  .badge { min-width:96px; text-align:center; padding:12px 8px; border-radius:14px; font-weight:800; color:#111; }
+  .badge b { display:block; font-size:32px; line-height:1.05; }
+  .Low { background:var(--low); } .Medium { background:var(--med); } .High { background:var(--high); }
+  .verdict { margin:0; font-size:22px; }
+  .muted { color:var(--muted); font-size:14px; }
+  .res ul { padding-left:20px; margin:14px 0 0; }
+  .clause { border-radius:10px; padding:10px 12px; margin-top:10px; font-size:14.5px; }
+  .clause.risky { background:rgba(216,58,58,.12); } .clause.caution { background:rgba(245,185,66,.18); } .clause.safe { background:rgba(46,158,91,.12); }
+  .pill { display:inline-block; font-size:11px; font-weight:800; padding:2px 8px; border-radius:99px; text-transform:uppercase; color:#111; }
+  .pill.risky { background:var(--high); color:#fff; } .pill.caution { background:var(--med); color:#fff; } .pill.safe { background:var(--low); color:#fff; }
+  .clause p { margin:4px 0 0; } .src { color:var(--muted); font-size:13.5px; }
+
+  .video { aspect-ratio:16/9; width:100%; border:0; border-radius:16px; background:#000; }
+  footer { padding:28px 0 40px; color:var(--muted); font-size:14px; text-align:center; }
+
+  @media (max-width: 860px) {
+    .hero .wrap, .try { grid-template-columns:1fr; }
+    .steps, .steps.four { grid-template-columns:1fr 1fr; }
+  }
+  @media (max-width: 560px) {
+    .steps, .steps.four { grid-template-columns:1fr; }
+    .hero { padding-top:32px; }
+    header .hide-sm { display:none; }
+    .pop { position:static; width:auto; margin:0 12px 12px; }
+    .page { padding-bottom:18px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <a class="logo" href="#"><img src="/static/icon.png" alt=""><span>Agree<b>Wise</b> AI</span></a>
+    <nav class="row" style="margin:0">
+      <a class="btn ghost hide-sm" href="#try">Try it live</a>
+      <a class="btn primary" href="/download/extension">Get the extension</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <span class="chip">Chrome Extension · AI-powered</span>
+        <h1>Know what you agree to, <span>before you click "I Agree".</span></h1>
+        <p class="lead">AgreeWise is a Chrome extension that reads Terms &amp; Conditions for you. It highlights risky clauses on the page and gives a simple risk score, in English and Tamil.</p>
+        <div class="ctas">
+          <a class="btn primary" href="/download/extension">Download extension</a>
+          <a class="btn ghost" href="#try">Try it live</a>
+        </div>
+        <p class="fine">Free · Works on any Terms or Privacy page · Nothing is sent until you click</p>
+      </div>
+      <div class="browser" aria-label="Preview of the AgreeWise extension on a Terms page">
+        <div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i>
+          <span class="url">example-app.com/terms</span><span class="ext" title="AgreeWise AI"></span></div>
+        <div class="page">
+          <h4>Terms &amp; Conditions</h4>
+          <div class="ln" style="width:92%"></div><div class="ln" style="width:80%"></div>
+          <div class="flag">…we may share your personal information with third parties…</div>
+          <div class="ln" style="width:86%"></div>
+          <div class="flag r">…you waive your right to join a class action…</div>
+          <span class="agree">I Agree</span>
+        </div>
+        <div class="pop">
+          <div class="s"><div class="b"><strong>55</strong>/100</div><div><b>Medium risk</b><br><span style="color:#9aaacb">1 risky · 4 caution</span></div></div>
+          Your data may be shared with other companies.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="wrap">
+      <h2>How it works</h2>
+      <p class="sub">Three steps. No legal knowledge needed.</p>
+      <div class="steps">
+        <div class="card"><div class="num">1</div><h3>Open any Terms page</h3><p>Sign-up pages, privacy policies, app terms. The AgreeWise badge appears in the corner.</p></div>
+        <div class="card"><div class="num">2</div><h3>Click the badge</h3><p>AI reads every clause and tags it safe, caution or risky.</p></div>
+        <div class="card"><div class="num">3</div><h3>See the risk</h3><p>A Low / Medium / High score, risky lines highlighted on the page, and a summary in English or Tamil.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="alt" id="install">
+    <div class="wrap">
+      <h2>Install in one minute</h2>
+      <p class="sub">Install it straight from this site, no Chrome Web Store account needed:</p>
+      <div class="steps four">
+        <div class="card"><div class="num">1</div><h3>Download</h3><p><a href="/download/extension">Download the zip</a> and unzip it.</p></div>
+        <div class="card"><div class="num">2</div><h3>Open extensions</h3><p>Go to <code>chrome://extensions</code> in Chrome.</p></div>
+        <div class="card"><div class="num">3</div><h3>Developer mode</h3><p>Turn on <b>Developer mode</b> (top right).</p></div>
+        <div class="card"><div class="num">4</div><h3>Load unpacked</h3><p>Click <b>Load unpacked</b> and pick the <code>agreewise-extension</code> folder. Done.</p></div>
+      </div>
+      <p class="fine">Want to test it? Open our <a href="/static/demo-terms.html">sample Terms page</a> after installing.</p>
+    </div>
+  </section>
+
+  <section id="try">
+    <div class="wrap">
+      <h2>Try it live</h2>
+      <p class="sub">The same AI engine the extension uses. Paste any policy, or load a sample.</p>
+      <div class="try">
+        <div class="card">
+          <textarea id="text" placeholder="Paste Terms & Conditions or a privacy policy here…"></textarea>
+          <div class="row"><input id="url" type="url" placeholder="…or a policy link (https://…)"></div>
+          <div class="row">
+            <button class="btn primary" id="go">Check risk</button>
+            <button class="btn ghost" id="sample">Load sample</button>
+            <span class="toggle"><button id="en" class="on">English</button> <button id="ta">தமிழ்</button></span>
+          </div>
+          <div id="err" role="alert"></div>
+        </div>
+        <div class="card res" id="out" aria-live="polite">
+          <div class="empty" id="empty">Your result will appear here: a risk score, a simple summary and the risky clauses.</div>
+          <div id="result" hidden>
+            <div class="score"><div class="badge" id="badge"></div>
+              <div><h3 class="verdict" id="verdict"></h3><div class="muted" id="counts"></div><div class="muted" id="note"></div></div></div>
+            <ul id="summary"></ul>
+            <div id="clauses"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="alt" id="demo" hidden>
+    <div class="wrap">
+      <h2>Watch the demo</h2>
+      <p class="sub">The extension working on a real sign-up page.</p>
+      <iframe class="video" id="video" title="AgreeWise AI demo" allowfullscreen></iframe>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">AgreeWise AI · DEXATHON 2026 · Open Innovation · Team DEX26150<br>A screening aid, not legal advice. We don't store the policies you check.</div>
+</footer>
+
+<script>
+  // Paste a YouTube link here to show the demo video section.
+  const DEMO_VIDEO = "";
+
+  const SAMPLE = `1. Information we collect. We collect your name, email address, phone number and device identifiers when you create an account.
+2. How we share it. We may share your personal information with third parties, including advertising partners and affiliates, for marketing purposes.
+3. Location. We collect your precise location through GPS, even when the app is running in the background.
+4. Cookies. We use cookies and tracking pixels to follow your activity across other websites.
+5. Subscriptions. Your plan will automatically renew each month and you will be charged the then-current price. All fees are non-refundable.
+6. Your content. You grant us a perpetual, irrevocable, royalty-free license to use any content you upload.
+7. Disputes. Any dispute will be resolved by binding arbitration and you waive your right to participate in a class action.
+8. Changes. We may change these terms at any time without notice. Continued use means you accept the changes.`;
+
+  const T = {
+    en: { risk:{Low:"Low risk",Medium:"Medium risk",High:"High risk"}, counts:(r,c)=>`${r} risky · ${c} caution`, none:"No risky clauses found." },
+    ta: { risk:{Low:"குறைந்த ஆபத்து",Medium:"நடுத்தர ஆபத்து",High:"அதிக ஆபத்து"}, counts:(r,c)=>`${r} ஆபத்தான · ${c} கவனிக்க`, none:"ஆபத்தான பிரிவுகள் எதுவும் இல்லை." }
+  };
+  let lang = "en", data = null;
+  const $ = id => document.getElementById(id);
+
+  function render() {
+    if (!data) return;
+    const t = T[lang];
+    $("empty").hidden = true; $("result").hidden = false;
+    const badge = $("badge");
+    badge.className = "badge " + data.level; badge.textContent = "";
+    const n = document.createElement("b"); n.textContent = data.score; badge.append(n, "/100");
+    $("verdict").textContent = t.risk[data.level];
+    $("counts").textContent = t.counts(data.risky, data.caution);
+    $("note").textContent = data.mode === "llm" ? "AI analysis" : (data.note || "Keyword analysis (AI key not set on server)");
+    const ul = $("summary"); ul.textContent = "";
+    for (const s of (lang === "ta" ? data.summary_ta : data.summary_en) || []) { const li = document.createElement("li"); li.textContent = s; ul.append(li); }
+    const box = $("clauses"); box.textContent = "";
+    if (!data.clauses.length) { box.textContent = t.none; return; }
+    for (const c of data.clauses) {
+      const d = document.createElement("div"); d.className = "clause " + c.risk;
+      const p = document.createElement("span"); p.className = "pill " + c.risk; p.textContent = c.risk;
+      const why = document.createElement("p"); why.textContent = lang === "ta" ? c.why_ta : c.why_en;
+      const src = document.createElement("p"); src.className = "src"; src.textContent = "“" + c.text + "”";
+      d.append(p, why, src); box.append(d);
+    }
+  }
+
+  function setLang(l) { lang = l; $("en").classList.toggle("on", l === "en"); $("ta").classList.toggle("on", l === "ta"); render(); }
+  $("en").onclick = () => setLang("en");
+  $("ta").onclick = () => setLang("ta");
+  $("sample").onclick = () => { $("text").value = SAMPLE; $("url").value = ""; $("text").focus(); };
+
+  $("go").onclick = async () => {
+    $("err").textContent = "";
+    const text = $("text").value.trim(), url = $("url").value.trim();
+    if (!text && !url) { $("err").textContent = "Paste policy text, enter a link, or load the sample."; return; }
+    $("go").disabled = true; $("go").textContent = "Checking…";
+    try {
+      const r = await fetch("/analyze", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(text ? { text } : { url }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.detail || "Something went wrong. Please try again.");
+      data = j; render();
+      if (window.innerWidth < 860) $("out").scrollIntoView({ behavior: "smooth" });
+    } catch (e) { $("err").textContent = e.message; }
+    finally { $("go").disabled = false; $("go").textContent = "Check risk"; }
+  };
+
+  (function showVideo() {
+    const m = DEMO_VIDEO.match(/(?:youtu\.be\/|v=|embed\/|shorts\/)([\w-]{11})/);
+    if (!m) return;
+    $("video").src = "https://www.youtube-nocookie.com/embed/" + m[1];
+    $("demo").hidden = false;
+  })();
+</script>
+</body>
+</html>

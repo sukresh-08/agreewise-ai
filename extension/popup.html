@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AgreeWise AI</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 360px; background: #0f1a33; color: #e8eefc; font: 14px/1.45 system-ui, "Noto Sans Tamil", sans-serif; }
+  main { padding: 14px; }
+  h1 { font-size: 18px; margin: 0; } h1 b { color: #f4a261; }
+  .sub { color: #93a3c4; margin: 2px 0 12px; font-size: 12px; }
+  button { font: inherit; cursor: pointer; border-radius: 10px; border: 0; }
+  .go { width: 100%; padding: 11px; font-weight: 700; color: #fff; background: linear-gradient(90deg,#f4a261,#ed7d31); }
+  .go:disabled { opacity: .7; cursor: wait; }
+  details { margin-top: 10px; } summary { cursor: pointer; color: #93a3c4; font-size: 12px; }
+  textarea { width: 100%; min-height: 90px; margin-top: 6px; padding: 8px; border-radius: 8px; border: 1px solid #3a4b70; background: #13213f; color: #e8eefc; font: inherit; }
+  .ghost { margin-top: 6px; padding: 7px 12px; background: #1f3864; color: #fff; }
+  #status { margin-top: 10px; color: #93a3c4; font-size: 12px; min-height: 16px; }
+  #status.err { color: #ffb3b3; }
+  #result { display: none; margin-top: 8px; }
+  .score { display: flex; gap: 12px; align-items: center; }
+  .badge { min-width: 76px; text-align: center; border-radius: 12px; padding: 8px; color: #111; font-weight: 800; }
+  .badge b { display: block; font-size: 26px; line-height: 1; }
+  .lvl { font-weight: 800; font-size: 16px; } .muted { color: #93a3c4; font-size: 12px; }
+  ul { padding-left: 18px; margin: 10px 0 0; } li { margin: 3px 0; }
+  .tabs { display: flex; gap: 6px; margin-top: 10px; }
+  .tab { flex: 1; padding: 6px; background: transparent; color: #e8eefc; border: 1px solid #3a4b70; }
+  .tab.on { background: #ed7d31; border-color: #ed7d31; font-weight: 700; }
+  .clause { margin-top: 8px; padding: 8px; border-radius: 8px; font-size: 12px; }
+  .clause.risky { background: rgba(216,58,58,.18); } .clause.caution { background: rgba(245,185,66,.18); } .clause.safe { background: rgba(46,158,91,.18); }
+  .clause b { text-transform: uppercase; font-size: 11px; }
+  .clause p { margin: 3px 0 0; } .clause q { color: #b9c6e2; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Agree<b>Wise</b> AI</h1>
+  <p class="sub">Know what you agree to, before you click "I Agree".</p>
+  <button class="go" id="go">Check this page</button>
+  <details id="pasteBox">
+    <summary>Or paste the terms text</summary>
+    <textarea id="paste" placeholder="Paste Terms & Conditions or a privacy policy..."></textarea>
+    <button class="ghost" id="goPaste">Check pasted text</button>
+  </details>
+  <div id="status" role="status"></div>
+  <section id="result">
+    <div class="score"><div class="badge" id="badge"></div><div><div class="lvl" id="lvl"></div><div class="muted" id="counts"></div></div></div>
+    <ul id="summary"></ul>
+    <div class="tabs"><button class="tab on" data-lang="en">English</button><button class="tab" data-lang="ta">தமிழ்</button></div>
+    <div id="clauses"></div>
+    <p class="muted" id="note"></p>
+  </section>
+</main>
+<script src="popup.js"></script>
+</body>
+</html>
