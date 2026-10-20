@@ -69,6 +69,10 @@ RULES.update({
                             "They can close your account at any time.",
                             "உங்கள் கணக்கை அவர்கள் எப்போது வேண்டுமானாலும் மூடலாம்."),
 })
+# "We do NOT sell / share / track ..." is good news, not a risk: skip these categories when negated.
+NEGATABLE = {"data_selling", "third_party_sharing", "location", "tracking"}
+NEG_RX = re.compile(r"\b(not|never|no|neither|nor|without your consent)\b[^.;]{0,40}?\b(sell|sold|selling|share|shared|sharing|"
+                    r"disclose[sd]?|disclosing|rent|trade|utili[sz]ed|collect|track)\w*", re.I)
 LEVEL_TA = {"Low": "குறைந்த ஆபத்து", "Medium": "நடுத்தர ஆபத்து", "High": "அதிக ஆபத்து"}
 
 
@@ -101,8 +105,9 @@ def heuristic_analyze(text: str) -> dict:
     per category are shown."""
     by_cat = {}
     for c in split_clauses(text):
+        negated = bool(NEG_RX.search(c))
         hits = [(lvl, cat, en, ta) for cat, (lvl, rx, en, ta) in RULES.items()
-                if re.search(rx, c, re.I)]
+                if re.search(rx, c, re.I) and not (negated and cat in NEGATABLE)]
         if not hits:
             continue
         hits.sort(key=lambda h: h[0] != "risky")  # risky first
