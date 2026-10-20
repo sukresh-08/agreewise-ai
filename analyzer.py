@@ -13,7 +13,7 @@ import urllib.error
 import urllib.request
 from urllib.parse import quote, urlparse
 
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 GEMINI_TIMEOUT = int(os.getenv("GEMINI_TIMEOUT", "90"))
 MAX_TEXT = 400_000      # total text accepted; Gemini's long context reads all of it

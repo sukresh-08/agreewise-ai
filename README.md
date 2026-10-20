@@ -24,7 +24,7 @@ DEXATHON 2026 · Open Innovation · Team DEX26150
 1. A content script spots Terms / Privacy pages (URL, title, or an "I agree" button) and shows a small badge.
    Nothing is sent until the user clicks it.
 2. The page text goes to the server (`POST /analyze`) through the extension's background worker.
-3. **AI mode (main):** Google **Gemini** (`gemini-2.5-flash` by default) reads the whole policy and returns,
+3. **AI mode (main):** Google **Gemini** (`gemini-3.8-flash` by default) reads the whole policy and returns,
    as structured JSON, the clauses that matter. Each is tagged `safe`, `caution` or `risky` with a plain
    reason in English and Tamil, plus a short summary in both languages. The model judges meaning, not
    keywords: "we do NOT sell your data" is good news, the company's own IP isn't a risk, a delivery
