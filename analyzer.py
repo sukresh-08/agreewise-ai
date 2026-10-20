@@ -42,7 +42,9 @@ RULES = {
     "fees": ("caution", r"non-?refundable|cancell?ation fee|fees may apply|late fee",
              "There may be extra or non-refundable charges.",
              "கூடுதல் அல்லது திரும்பப்பெற முடியாத கட்டணங்கள் இருக்கலாம்."),
-    "terms_change": ("caution", r"(change|modify|update) (these|this|the) (terms|policy).{0,40}(any time|without (prior )?notice)|without (prior )?notice",
+    "terms_change": ("caution", r"(change|modify|update|amend|revise)\w*\b.{0,60}\b(terms|polic(y|ies)|agreement)\b.{0,80}"
+                                r"(any time|without (prior |any )?(prior )?notice|sole discretion)"
+                                r"|\b(terms|polic(y|ies))\b.{0,40}\b(may|can) (be )?(changed|modified|updated)\b",
                      "The terms can change without notice.",
                      "விதிமுறைகள் அறிவிப்பின்றி மாற்றப்படலாம்."),
     "retention": ("caution", r"\bretain|indefinite(ly)?|as long as (necessary|needed)",
@@ -52,6 +54,19 @@ RULES = {
                  "Your activity may be tracked.",
                  "உங்கள் செயல்பாடுகள் கண்காணிக்கப்படலாம்."),
 }
+RULES.update({
+    "liability_limit": ("caution", r"limitation of liability|in no event\b.{0,40}\b(liable|responsible)|(shall|will) not be (liable|responsible)|"
+                                   r"liability (is|shall be) limited|disclaim(s|er)? (all|any) (warrant|liabilit)",
+                        "The company limits its responsibility if something goes wrong.",
+                        "ஏதேனும் தவறு நடந்தால் நிறுவனம் தனது பொறுப்பைக் குறைத்துக்கொள்கிறது."),
+    "indemnity": ("caution", r"\bindemnif(y|ies|ied|ication)\b|hold (us|[a-z]+) harmless",
+                  "You may have to pay the company's legal costs in some cases.",
+                  "சில சூழல்களில் நிறுவனத்தின் சட்டச் செலவுகளை நீங்கள் செலுத்த வேண்டியிருக்கலாம்."),
+    "account_termination": ("caution", r"(suspend|terminate|deactivate|block)\w*\b.{0,60}\b(your )?(account|access)\b.{0,80}"
+                                       r"(at any time|without (prior )?notice|sole discretion|for any reason)",
+                            "They can close your account at any time.",
+                            "உங்கள் கணக்கை அவர்கள் எப்போது வேண்டுமானாலும் மூடலாம்."),
+})
 LEVEL_TA = {"Low": "குறைந்த ஆபத்து", "Medium": "நடுத்தர ஆபத்து", "High": "அதிக ஆபத்து"}
 
 
