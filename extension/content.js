@@ -53,6 +53,25 @@
     marked.clear();
   }
 
+  // AI excerpts can include a section heading ("Disputes\n Any dispute ...") or span several
+  // page elements, so try each line of the excerpt (longest first) and a few windows inside it.
+  function findNode(texts, excerpt) {
+    const lines = String(excerpt || "").split(/\n+/)
+      .map((l) => norm(l).replace(/^["“'….\s]+/, ""))
+      .filter((l) => l.length >= 15)
+      .sort((a, b) => b.length - a.length);
+    for (const line of lines) {
+      const keys = [line.slice(0, 50)];
+      for (let at = 40; at + 30 <= line.length && keys.length < 5; at += 40) keys.push(line.slice(at, at + 40));
+      for (const key of keys) {
+        if (key.trim().length < 15) continue;
+        const i = texts.findIndex((t) => t.includes(key));
+        if (i >= 0) return i;
+      }
+    }
+    return -1;
+  }
+
   function highlight(clauses) {
     clearHighlights();
     const nodes = [];
@@ -65,9 +84,7 @@
     let first = null;
     for (const c of clauses || []) {
       if (c.risk !== "risky" && c.risk !== "caution") continue;
-      const key = norm(c.text).replace(/^["“'….\s]+/, "").slice(0, 50);
-      if (key.length < 15) continue;
-      const i = texts.findIndex((t) => t.includes(key));
+      const i = findNode(texts, c.text);
       if (i < 0) continue;
       const el = nodes[i].parentElement;
       if (!el || marked.has(el)) continue;
