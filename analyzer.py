@@ -34,7 +34,8 @@ RULES = {
                             r"\b(your|personal) (data|information)",
                             "Your data may be shared with other companies.",
                             "உங்கள் தரவு பிற நிறுவனங்களுடன் பகிரப்படலாம்."),
-    "location": ("caution", r"\blocation\b|\bgps\b|geolocation",
+    "location": ("caution", r"\b(collect|track|access|record|store|obtain|share|monitor)\w*\b.{0,60}\b(your |precise |real[- ]time )?"
+                            r"(location|whereabouts)\b|\bgps\b|geolocation|location (data|information|history|services)",
                  "Your location may be collected.",
                  "உங்கள் இருப்பிடம் சேகரிக்கப்படலாம்."),
     "auto_renew": ("caution", r"auto[- ]?renew|automatically renew|recurring (charge|billing|payment)",
