@@ -26,7 +26,11 @@ RULES = {
     "legal_waiver": ("risky", r"arbitration|class[- ]action|waive[sd]? (your )?(right|claim)|jury trial",
                      "You may give up your right to sue or join a class action.",
                      "வழக்கு தொடரும் உரிமையை நீங்கள் விட்டுக்கொடுக்க நேரலாம்."),
-    "third_party_sharing": ("caution", r"third[- ]part(y|ies)|affiliates|advertis(er|ing) partners|share (your|personal)",
+    "third_party_sharing": ("caution",
+                            r"\b(share[sd]?|sharing|disclose[sd]?|disclosing|transfer(s|red)?|make available)\b.{0,80}"
+                            r"\b(third[- ]part(y|ies)(?!\s+accounts?)|affiliates|partners|advertisers?)\b"
+                            r"|\b(third[- ]part(y|ies)|partners|advertisers?)\b.{0,60}\b(receive|access|obtain)\b.{0,30}"
+                            r"\b(your|personal) (data|information)",
                             "Your data may be shared with other companies.",
                             "உங்கள் தரவு பிற நிறுவனங்களுடன் பகிரப்படலாம்."),
     "location": ("caution", r"\blocation\b|\bgps\b|geolocation",
@@ -75,7 +79,10 @@ def risk_score(clauses: list[dict]) -> dict:
 
 
 def heuristic_analyze(text: str) -> dict:
-    clauses = []
+    """Keyword rules. Each category counts once toward the score (so one issue
+    repeated across many lines doesn't inflate it); up to 2 example clauses
+    per category are shown."""
+    by_cat = {}
     for c in split_clauses(text):
         hits = [(lvl, cat, en, ta) for cat, (lvl, rx, en, ta) in RULES.items()
                 if re.search(rx, c, re.I)]
@@ -83,15 +90,17 @@ def heuristic_analyze(text: str) -> dict:
             continue
         hits.sort(key=lambda h: h[0] != "risky")  # risky first
         lvl, cat, en, ta = hits[0]
-        clauses.append({"text": c[:300], "risk": lvl, "category": cat,
-                        "why_en": en, "why_ta": ta})
-    stats = risk_score(clauses)
-    summary_en = [f"{stats['risky']} risky and {stats['caution']} caution clauses found."] + \
-        sorted({c["why_en"] for c in clauses})[:5]
-    summary_ta = [f"{stats['risky']} ஆபத்தான மற்றும் {stats['caution']} கவனிக்க வேண்டிய பிரிவுகள் கண்டறியப்பட்டன."] + \
-        sorted({c["why_ta"] for c in clauses})[:5]
+        by_cat.setdefault(cat, []).append({"text": c[:300], "risk": lvl, "category": cat,
+                                           "why_en": en, "why_ta": ta})
+    reps = [v[0] for v in by_cat.values()]          # one per category, for the score
+    shown = [c for v in by_cat.values() for c in v[:2]]
+    stats = risk_score(reps)
+    summary_en = [f"{stats['risky']} risky and {stats['caution']} caution issues found."] + \
+        [c["why_en"] for c in sort_clauses(reps)][:5]
+    summary_ta = [f"{stats['risky']} ஆபத்தான மற்றும் {stats['caution']} கவனிக்க வேண்டிய சிக்கல்கள் கண்டறியப்பட்டன."] + \
+        [c["why_ta"] for c in sort_clauses(reps)][:5]
     return {"mode": "heuristic", "summary_en": summary_en, "summary_ta": summary_ta,
-            "clauses": sort_clauses(clauses), **stats}
+            "clauses": sort_clauses(shown), **stats}
 
 
 SYSTEM_PROMPT = """You analyse Terms & Conditions and privacy policies for ordinary users.
