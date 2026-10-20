@@ -49,7 +49,9 @@ RULES = {
                                 r"|\b(terms|polic(y|ies))\b.{0,40}\b(may|can) (be )?(changed|modified|updated)\b",
                      "The terms can change without notice.",
                      "விதிமுறைகள் அறிவிப்பின்றி மாற்றப்படலாம்."),
-    "retention": ("caution", r"\bretain|indefinite(ly)?|as long as (necessary|needed)",
+    "retention": ("caution", r"\b(retain|store|keep|preserve)\w*\b.{0,40}\b(your |personal |user )?(data|information|records|"
+                             r"content)\b.{0,80}\b(indefinite(ly)?|as long as|after (you|your account)|even after)|"
+                             r"\bindefinite(ly)?\b.{0,40}\b(data|information|records)|(data|information)\b.{0,40}\bindefinite(ly)?",
                   "Your data may be stored for a long time.",
                   "உங்கள் தரவு நீண்ட காலம் சேமிக்கப்படலாம்."),
     "tracking": ("caution", r"cookies?|tracking|fingerprint|web beacons?|pixel tags?",
@@ -69,6 +71,11 @@ RULES.update({
                             "They can close your account at any time.",
                             "உங்கள் கணக்கை அவர்கள் எப்போது வேண்டுமானாலும் மூடலாம்."),
 })
+# Some rules only count when the clause is about the USER's content / data.
+REQUIRES = {
+    "content_license": re.compile(r"\byou\b.{0,80}\b(grant|licen[cs]e|agree)|\b(your|user'?s?) (content|information|data|submissions?|"
+                                  r"posts?|photos?|reviews?)\b|(supplied|uploaded|submitted|provided|posted) by you|content you", re.I),
+}
 # "We do NOT sell / share / track ..." is good news, not a risk: skip these categories when negated.
 NEGATABLE = {"data_selling", "third_party_sharing", "location", "tracking"}
 NEG_RX = re.compile(r"\b(not|never|no|neither|nor|without your consent)\b[^.;]{0,40}?\b(sell|sold|selling|share|shared|sharing|"
@@ -107,7 +114,8 @@ def heuristic_analyze(text: str) -> dict:
     for c in split_clauses(text):
         negated = bool(NEG_RX.search(c))
         hits = [(lvl, cat, en, ta) for cat, (lvl, rx, en, ta) in RULES.items()
-                if re.search(rx, c, re.I) and not (negated and cat in NEGATABLE)]
+                if re.search(rx, c, re.I) and not (negated and cat in NEGATABLE)
+                and (cat not in REQUIRES or REQUIRES[cat].search(c))]
         if not hits:
             continue
         hits.sort(key=lambda h: h[0] != "risky")  # risky first
