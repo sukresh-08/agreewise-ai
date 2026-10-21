@@ -227,8 +227,13 @@ def call_gemini(text: str, api_key: str) -> dict:
                 resp = json.loads(r.read().decode())
             break
         except urllib.error.HTTPError as e:
-            detail = e.read().decode(errors="replace")[:500]
-            print(f"[agreewise] Gemini HTTP {e.code} (attempt {attempt + 1}): {detail}", flush=True)  # server log only
+            detail = e.read().decode(errors="replace")[:2000]
+            try:   # log just Google's message, on one line
+                msg = json.loads(detail).get("error", {}).get("message", detail)
+            except (ValueError, AttributeError):
+                msg = detail
+            msg = " ".join(str(msg).split())[:300]
+            print(f"[agreewise] Gemini HTTP {e.code} (attempt {attempt + 1}): {msg}", flush=True)  # server log only
             quota_gone = e.code == 429 and ("PerDay" in detail or "free_tier" in detail
                                              or re.search(r"retry in \d+h", detail) is not None)
             if quota_gone:
