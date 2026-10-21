@@ -280,9 +280,13 @@ def analyze_text(text: str) -> dict:
     try:
         return llm_analyze(text, api_key)
     except AIUnavailable as exc:
-        result = heuristic_analyze(text)
-        result["note"] = f"AI unavailable ({exc.reason}); used keyword rules."
-        return result
+        reason = exc.reason
+    except Exception as exc:  # unexpected answer shape etc. -> never fail the request
+        print(f"[agreewise] AI analysis error: {type(exc).__name__}: {exc}", flush=True)
+        reason = "unexpected AI answer"
+    result = heuristic_analyze(text)
+    result["note"] = f"AI unavailable ({reason}); used keyword rules."
+    return result
 
 
 def _check_public_host(url: str) -> None:

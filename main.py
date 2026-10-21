@@ -1,5 +1,6 @@
 """AgreeWise AI server (FastAPI). Run: uvicorn main:app --reload"""
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -22,7 +23,9 @@ async def analyze(request: Request):
     except Exception:
         raise HTTPException(status_code=400, detail="Send JSON with 'text' or 'url'.")
     try:
-        return handle_analyze(payload)
+        # The Gemini call blocks for 10-60 s; run it in a worker thread so the event loop
+        # keeps answering other requests (and Render's /health checks) meanwhile.
+        return await run_in_threadpool(handle_analyze, payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception:
