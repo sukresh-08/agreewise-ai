@@ -38,8 +38,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     .then((data) => {
       const b = BADGE[data.level];
       if (tabId && b) {
-        chrome.action.setBadgeText({ tabId, text: b.text });
-        chrome.action.setBadgeBackgroundColor({ tabId, color: b.color });
+        // The tab may have been closed while the check was running; that's fine.
+        chrome.action.setBadgeText({ tabId, text: b.text }).catch(() => {});
+        chrome.action.setBadgeBackgroundColor({ tabId, color: b.color }).catch(() => {});
       }
       sendResponse({ ok: true, data });
     })

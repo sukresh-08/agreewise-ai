@@ -207,22 +207,39 @@
     if (first) first.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
+  // After the extension is reloaded or updated, scripts left in already-open tabs can no
+  // longer talk to it ("Extension context invalidated"). Ask the user to refresh instead.
+  const REFRESH_MSG = "AgreeWise was updated. Please refresh this page (F5) and try again.";
+  function extensionAlive() {
+    try { return Boolean(chrome.runtime && chrome.runtime.id); } catch (_) { return false; }
+  }
+
   function run() {
     mount();
+    if (!extensionAlive()) {
+      data = { __error: REFRESH_MSG }; render(); setPill("AgreeWise: refresh page", false);
+      return;
+    }
     setPill("Checking… (first check can take up to a minute)", true);
-    chrome.runtime.sendMessage({ type: "agreewise:analyze", text: pageText() }, (resp) => {
-      if (chrome.runtime.lastError || !resp) {
-        data = { __error: "Could not reach the AgreeWise server. Try again." };
-        render(); setPill("AgreeWise: try again", false);
-        return;
-      }
-      if (!resp.ok) {
-        data = { __error: resp.error };
-        render(); setPill("AgreeWise: try again", false);
-        return;
-      }
-      show(resp.data);
-    });
+    try {
+      chrome.runtime.sendMessage({ type: "agreewise:analyze", text: pageText() }, onResult);
+    } catch (_) {
+      data = { __error: REFRESH_MSG }; render(); setPill("AgreeWise: refresh page", false);
+    }
+  }
+
+  function onResult(resp) {
+    if (chrome.runtime.lastError || !resp) {
+      data = { __error: "Could not reach the AgreeWise server. Try again." };
+      render(); setPill("AgreeWise: try again", false);
+      return;
+    }
+    if (!resp.ok) {
+      data = { __error: resp.error };
+      render(); setPill("AgreeWise: try again", false);
+      return;
+    }
+    show(resp.data);
   }
 
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
