@@ -1,0 +1,14 @@
+# Render's free plan sleeps after ~15 minutes without traffic, and waking up
+# adds ~50 seconds to the next check. Ping /health every 10 minutes so the
+# AgreeWise server stays awake. (Free for public repos.)
+name: Keep server awake
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: curl -fsS --max-time 90 https://agreewise-ai-m75h.onrender.com/health || echo "server did not answer"
