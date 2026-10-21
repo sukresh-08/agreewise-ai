@@ -6,12 +6,25 @@ const BADGE = {
   High: { text: "HIGH", color: "#d83a3a" },
 };
 
+const TIMEOUT_MS = 120000; // give up after 2 minutes instead of "Checking..." forever
+
 async function analyze(text) {
-  const res = await fetch(AGREEWISE_API + "/analyze", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: String(text || "").slice(0, 400000) }),
-  });
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  let res;
+  try {
+    res = await fetch(AGREEWISE_API + "/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: String(text || "").slice(0, 400000) }),
+      signal: ctrl.signal,
+    });
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error("The server took too long. Please try again.");
+    throw new Error("Could not reach the AgreeWise server. Check your internet and try again.");
+  } finally {
+    clearTimeout(timer);
+  }
   let body = null;
   try { body = await res.json(); } catch (_) { /* not JSON */ }
   if (!res.ok) throw new Error((body && body.detail) || `Server error (${res.status})`);
