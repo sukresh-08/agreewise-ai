@@ -4,6 +4,7 @@ Works in two modes:
   * AI mode   - Google Gemini reads the policy (needs GEMINI_API_KEY). This is the main mode.
   * heuristic - keyword rules, used only as a fallback when the AI call is unavailable
 """
+import hashlib
 import ipaddress
 import json
 import os
@@ -20,6 +21,8 @@ GEMINI_TIMEOUT = int(os.getenv("GEMINI_TIMEOUT", "90"))
 GEMINI_ATTEMPTS = 3                      # 1 try + 2 retries on busy / server errors
 RETRY_CODES = {429, 500, 502, 503, 504}
 RETRY_WAITS = [2, 5]                     # seconds before retry 1 and retry 2
+_CACHE: dict = {}                        # sha256(text) -> AI result; saves the daily quota on repeat checks
+CACHE_MAX = 300
 MAX_TEXT = 400_000      # total text accepted; Gemini's long context reads all of it
 MAX_CLAUSES = 5_000
 
@@ -226,6 +229,10 @@ def call_gemini(text: str, api_key: str) -> dict:
         except urllib.error.HTTPError as e:
             detail = e.read().decode(errors="replace")[:500]
             print(f"[agreewise] Gemini HTTP {e.code} (attempt {attempt + 1}): {detail}", flush=True)  # server log only
+            quota_gone = e.code == 429 and ("PerDay" in detail or "free_tier" in detail
+                                             or re.search(r"retry in \d+h", detail) is not None)
+            if quota_gone:
+                raise AIUnavailable("daily free Gemini limit reached, resets in about a day") from None
             if e.code in RETRY_CODES and not last:
                 wait = RETRY_WAITS[attempt]
                 try:  # honour Retry-After when Google sends one (capped)
@@ -296,8 +303,15 @@ def analyze_text(text: str) -> dict:
         result = heuristic_analyze(text)
         result["note"] = "AI key not set on the server; used keyword rules."
         return result
+    key = hashlib.sha256(text.encode()).hexdigest()
+    if key in _CACHE:
+        return dict(_CACHE[key], cached=True)
     try:
-        return llm_analyze(text, api_key)
+        result = llm_analyze(text, api_key)
+        if len(_CACHE) >= CACHE_MAX:
+            _CACHE.pop(next(iter(_CACHE)))      # drop the oldest entry
+        _CACHE[key] = result
+        return result
     except AIUnavailable as exc:
         reason = exc.reason
     except Exception as exc:  # unexpected answer shape etc. -> never fail the request
