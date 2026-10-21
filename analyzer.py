@@ -9,6 +9,7 @@ import json
 import os
 import re
 import socket
+import time
 import urllib.error
 import urllib.request
 from urllib.parse import quote, urlparse
@@ -16,6 +17,9 @@ from urllib.parse import quote, urlparse
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 GEMINI_TIMEOUT = int(os.getenv("GEMINI_TIMEOUT", "90"))
+GEMINI_ATTEMPTS = 3                      # 1 try + 2 retries on busy / server errors
+RETRY_CODES = {429, 500, 502, 503, 504}
+RETRY_WAITS = [2, 5]                     # seconds before retry 1 and retry 2
 MAX_TEXT = 400_000      # total text accepted; Gemini's long context reads all of it
 MAX_CLAUSES = 5_000
 
@@ -208,24 +212,39 @@ def call_gemini(text: str, api_key: str) -> dict:
             "responseSchema": RESPONSE_SCHEMA,
         },
     }
-    req = urllib.request.Request(
-        GEMINI_URL.format(model=quote(GEMINI_MODEL, safe="-._")),
-        data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=GEMINI_TIMEOUT) as r:
-            resp = json.loads(r.read().decode())
-    except urllib.error.HTTPError as e:
-        detail = e.read().decode(errors="replace")[:500]
-        print(f"[agreewise] Gemini HTTP {e.code}: {detail}", flush=True)   # server log only
-        reason = {400: "bad request or invalid key", 401: "invalid API key", 403: "API key not allowed",
-                  404: "model not found", 429: "rate limit reached"}.get(e.code, f"HTTP {e.code}")
-        raise AIUnavailable(reason) from None
-    except (urllib.error.URLError, TimeoutError, OSError) as e:
-        print(f"[agreewise] Gemini network error: {e}", flush=True)
-        raise AIUnavailable("could not reach Gemini") from None
+    data = json.dumps(body).encode()
+    url = GEMINI_URL.format(model=quote(GEMINI_MODEL, safe="-._"))
+    resp = None
+    for attempt in range(GEMINI_ATTEMPTS):
+        last = attempt == GEMINI_ATTEMPTS - 1
+        req = urllib.request.Request(url, data=data, method="POST",
+                                     headers={"Content-Type": "application/json", "x-goog-api-key": api_key})
+        try:
+            with urllib.request.urlopen(req, timeout=GEMINI_TIMEOUT) as r:
+                resp = json.loads(r.read().decode())
+            break
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode(errors="replace")[:500]
+            print(f"[agreewise] Gemini HTTP {e.code} (attempt {attempt + 1}): {detail}", flush=True)  # server log only
+            if e.code in RETRY_CODES and not last:
+                wait = RETRY_WAITS[attempt]
+                try:  # honour Retry-After when Google sends one (capped)
+                    wait = min(10.0, max(wait, float(e.headers.get("Retry-After", 0))))
+                except (TypeError, ValueError):
+                    pass
+                time.sleep(wait)
+                continue
+            reason = {400: "bad request or invalid key", 401: "invalid API key", 403: "API key not allowed",
+                      404: "model not found", 429: "rate limit reached, try again in a minute",
+                      500: "Gemini server error, try again", 503: "Gemini is busy, try again"
+                      }.get(e.code, f"HTTP {e.code}")
+            raise AIUnavailable(reason) from None
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            print(f"[agreewise] Gemini network error (attempt {attempt + 1}): {e}", flush=True)
+            if not last:
+                time.sleep(RETRY_WAITS[attempt])
+                continue
+            raise AIUnavailable("could not reach Gemini") from None
 
     cands = resp.get("candidates") or []
     if not cands:
