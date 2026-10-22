@@ -18,7 +18,11 @@ from urllib.parse import quote, urlparse
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 GEMINI_TIMEOUT = int(os.getenv("GEMINI_TIMEOUT", "60"))
-GEMINI_ATTEMPTS = 3                      # 1 try + 2 retries on busy / server errors
+# Backup model, tried when the main one is busy / out of quota / unavailable (separate capacity and quota).
+GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite").strip()
+GEMINI_ATTEMPTS = 3                      # main model: 1 try + 2 retries on busy / server errors
+FALLBACK_ATTEMPTS = 2                    # backup model: 1 try + 1 retry
+FALLBACK_BUDGET = 40                     # only try the backup if the main model gave up within this many seconds
 RETRY_CODES = {429, 500, 502, 503, 504}
 RETRY_WAITS = [2, 5]                     # seconds before retry 1 and retry 2
 _CACHE: dict = {}                        # sha256(text) -> AI result; saves the daily quota on repeat checks
@@ -193,9 +197,10 @@ RESPONSE_SCHEMA = {
 class AIUnavailable(Exception):
     """The AI call failed; `reason` is short and safe to show to users."""
 
-    def __init__(self, reason: str):
+    def __init__(self, reason: str, switch: bool = False):
         super().__init__(reason)
         self.reason = reason
+        self.switch = switch   # True: worth trying the backup model
 
 
 def _norm(s: str) -> str:
@@ -203,7 +208,25 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().lower()
 
 
-def call_gemini(text: str, api_key: str) -> dict:
+def call_gemini(text: str, api_key: str) -> tuple:
+    """Ask the main model; if it is busy / out of quota / missing, ask the backup model.
+    Returns (parsed JSON, model name used)."""
+    start = time.monotonic()
+    try:
+        return _call_model(text, api_key, GEMINI_MODEL, GEMINI_ATTEMPTS), GEMINI_MODEL
+    except AIUnavailable as e:
+        fb = GEMINI_FALLBACK_MODEL
+        if not (e.switch and fb and fb != GEMINI_MODEL and time.monotonic() - start < FALLBACK_BUDGET):
+            raise
+        print(f"[agreewise] {GEMINI_MODEL} unavailable ({e.reason}); trying backup {fb}", flush=True)
+        try:
+            return _call_model(text, api_key, fb, FALLBACK_ATTEMPTS), fb
+        except AIUnavailable as e2:
+            print(f"[agreewise] backup {fb} also failed ({e2.reason})", flush=True)
+            raise e from None   # show the main model's reason to the user
+
+
+def _call_model(text: str, api_key: str, model: str, attempts: int) -> dict:
     """One generateContent call with a JSON response schema. Returns the parsed JSON."""
     body = {
         "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
@@ -216,10 +239,10 @@ def call_gemini(text: str, api_key: str) -> dict:
         },
     }
     data = json.dumps(body).encode()
-    url = GEMINI_URL.format(model=quote(GEMINI_MODEL, safe="-._"))
+    url = GEMINI_URL.format(model=quote(model, safe="-._"))
     resp = None
-    for attempt in range(GEMINI_ATTEMPTS):
-        last = attempt == GEMINI_ATTEMPTS - 1
+    for attempt in range(attempts):
+        last = attempt == attempts - 1
         req = urllib.request.Request(url, data=data, method="POST",
                                      headers={"Content-Type": "application/json", "x-goog-api-key": api_key})
         try:
@@ -233,11 +256,11 @@ def call_gemini(text: str, api_key: str) -> dict:
             except (ValueError, AttributeError):
                 msg = detail
             msg = " ".join(str(msg).split())[:300]
-            print(f"[agreewise] Gemini HTTP {e.code} (attempt {attempt + 1}): {msg}", flush=True)  # server log only
+            print(f"[agreewise] {model} HTTP {e.code} (attempt {attempt + 1}): {msg}", flush=True)  # server log only
             quota_gone = e.code == 429 and ("PerDay" in detail or "free_tier" in detail
                                              or re.search(r"retry in \d+h", detail) is not None)
             if quota_gone:
-                raise AIUnavailable("daily free Gemini limit reached, resets in about a day") from None
+                raise AIUnavailable("daily free Gemini limit reached, resets in about a day", switch=True) from None
             if e.code in RETRY_CODES and not last:
                 wait = RETRY_WAITS[attempt]
                 try:  # honour Retry-After when Google sends one (capped)
@@ -250,9 +273,9 @@ def call_gemini(text: str, api_key: str) -> dict:
                       404: "model not found", 429: "rate limit reached, try again in a minute",
                       500: "Gemini server error, try again", 503: "Gemini is busy, try again"
                       }.get(e.code, f"HTTP {e.code}")
-            raise AIUnavailable(reason) from None
+            raise AIUnavailable(reason, switch=e.code in RETRY_CODES or e.code == 404) from None
         except (urllib.error.URLError, TimeoutError, OSError) as e:
-            print(f"[agreewise] Gemini network error (attempt {attempt + 1}): {e}", flush=True)
+            print(f"[agreewise] {model} network error (attempt {attempt + 1}): {e}", flush=True)
             timed_out = isinstance(e, TimeoutError) or "timed out" in str(e)
             if timed_out:   # a slow answer will be slow again; don't make the user wait 3x
                 raise AIUnavailable("Gemini took too long, try again") from None
@@ -264,7 +287,7 @@ def call_gemini(text: str, api_key: str) -> dict:
     cands = resp.get("candidates") or []
     if not cands:
         block = (resp.get("promptFeedback") or {}).get("blockReason", "no answer")
-        raise AIUnavailable(f"Gemini returned no answer ({block})")
+        raise AIUnavailable(f"Gemini returned no answer ({block})", switch=True)
     parts = (cands[0].get("content") or {}).get("parts") or []
     raw = "".join(p.get("text", "") for p in parts).strip()
     raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw)
@@ -273,11 +296,11 @@ def call_gemini(text: str, api_key: str) -> dict:
     except json.JSONDecodeError:
         finish = cands[0].get("finishReason", "")
         print(f"[agreewise] Gemini returned unreadable JSON (finishReason={finish})", flush=True)
-        raise AIUnavailable("AI answer was incomplete") from None
+        raise AIUnavailable("AI answer was incomplete", switch=True) from None
 
 
 def llm_analyze(text: str, api_key: str) -> dict:
-    data = call_gemini(text, api_key)
+    data, engine = call_gemini(text, api_key)
     source = _norm(text)
     clauses, seen = [], set()
     for c in data.get("clauses") or []:
@@ -296,7 +319,7 @@ def llm_analyze(text: str, api_key: str) -> dict:
     for c in clauses:
         if c["risk"] != "safe":
             reps.setdefault((c["category"], c["why_en"]) if c["category"] == "other" else c["category"], c)
-    return {"mode": "llm", "engine": GEMINI_MODEL,
+    return {"mode": "llm", "engine": engine,
             "summary_en": [str(s) for s in data.get("summary_en") or []][:6],
             "summary_ta": [str(s) for s in data.get("summary_ta") or []][:6],
             "clauses": clauses, **risk_score(list(reps.values()))}

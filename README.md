@@ -41,7 +41,8 @@ DEXATHON 2026 · Open Innovation · Team DEX26150
 1. Push this folder to GitHub (`.env` is git-ignored, so your key stays private).
 2. On render.com: **New > Blueprint**, pick the repo (it reads `render.yaml`).
 3. In the service's **Environment** tab set `GEMINI_API_KEY` to your key (get one at aistudio.google.com).
-   Optional: `GEMINI_MODEL` to use a different Gemini model.
+   Optional: `GEMINI_MODEL` to use a different Gemini model, and `GEMINI_FALLBACK_MODEL` for the backup model
+   used when the main one is busy (default `gemini-3.5-flash-lite`).
 4. Open the site URL. The **Download extension** button gives a zip that already points to your server.
 
 The free tier sleeps when idle, so the first check after a break can take up to a minute.
